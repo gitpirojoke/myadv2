@@ -1,50 +1,42 @@
 <?php
+
 namespace common\models;
 
 use Yii;
-use yii\base\NotSupportedException;
-use yii\behaviors\TimestampBehavior;
-use yii\db\ActiveRecord;
-use yii\web\IdentityInterface;
 
 /**
- * User model
+ * This is the model class for table "users".
  *
- * @property integer $id
- * @property string $username
- * @property string $password_hash
- * @property string $password_reset_token
- * @property string $verification_token
- * @property string $email
- * @property string $auth_key
- * @property integer $status
- * @property integer $created_at
- * @property integer $updated_at
- * @property string $password write-only password
+ * @property int $id
+ * @property string $login Логин пользователя
+ * @property string|null $name ФИО пользователя
+ * @property string $email Электронная почта пользователя
+ * @property string|null $password Пароль пользователя
+ * @property string|null $born_date Дата рождения пользователя
+ * @property string|null $gender Пол
+ * @property int|null $updated_at Дата обновления
+ *
+ * @property Attestat[] $attestats
+ * @property Attestat[] $attestats0
+ * @property ExamLog[] $examLogs
+ * @property ExamLog[] $examLogs0
+ * @property TeacherDisciplines[] $teacherDisciplines
+ * @property Discipline[] $disciplines
+ * @property TeacherGroups[] $teacherGroups
+ * @property Groups[] $groups
+ * @property UserGroups[] $userGroups
+ * @property Groups[] $groups0
+ * @property UsersRoles[] $usersRoles
+ * @property Roles[] $roles
  */
-class User extends ActiveRecord implements IdentityInterface
+class User extends \yii\db\ActiveRecord
 {
-    const STATUS_DELETED = 0;
-    const STATUS_INACTIVE = 9;
-    const STATUS_ACTIVE = 10;
-
-
     /**
      * {@inheritdoc}
      */
     public static function tableName()
     {
-        return '{{%user}}';
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function behaviors()
-    {
-        return [
-            TimestampBehavior::className(),
-        ];
+        return 'users';
     }
 
     /**
@@ -53,160 +45,127 @@ class User extends ActiveRecord implements IdentityInterface
     public function rules()
     {
         return [
-            ['status', 'default', 'value' => self::STATUS_INACTIVE],
-            ['status', 'in', 'range' => [self::STATUS_ACTIVE, self::STATUS_INACTIVE, self::STATUS_DELETED]],
+            [['login', 'email'], 'required'],
+            [['born_date'], 'safe'],
+            [['updated_at'], 'integer'],
+            [['login'], 'string', 'max' => 128],
+            [['name', 'email'], 'string', 'max' => 250],
+            [['password', 'gender'], 'string', 'max' => 255],
+            [['login'], 'unique'],
+            [['email'], 'unique'],
         ];
     }
 
     /**
      * {@inheritdoc}
      */
-    public static function findIdentity($id)
+    public function attributeLabels()
     {
-        return static::findOne(['id' => $id, 'status' => self::STATUS_ACTIVE]);
+        return [
+            'id' => 'ID',
+            'login' => 'Логин пользователя',
+            'name' => 'ФИО пользователя',
+            'email' => 'Электронная почта пользователя',
+            'password' => 'Пароль пользователя',
+            'born_date' => 'Дата рождения пользователя',
+            'gender' => 'Пол',
+            'updated_at' => 'Дата обновления',
+        ];
     }
 
     /**
-     * {@inheritdoc}
+     * @return \yii\db\ActiveQuery
      */
-    public static function findIdentityByAccessToken($token, $type = null)
+    public function getAttestats()
     {
-        throw new NotSupportedException('"findIdentityByAccessToken" is not implemented.');
+        return $this->hasMany(Attestat::className(), ['student_id' => 'id']);
     }
 
     /**
-     * Finds user by username
-     *
-     * @param string $username
-     * @return static|null
+     * @return \yii\db\ActiveQuery
      */
-    public static function findByUsername($username)
+    public function getAttestats0()
     {
-        return static::findOne(['username' => $username, 'status' => self::STATUS_ACTIVE]);
+        return $this->hasMany(Attestat::className(), ['teacher_id' => 'id']);
     }
 
     /**
-     * Finds user by password reset token
-     *
-     * @param string $token password reset token
-     * @return static|null
+     * @return \yii\db\ActiveQuery
      */
-    public static function findByPasswordResetToken($token)
+    public function getExamLogs()
     {
-        if (!static::isPasswordResetTokenValid($token)) {
-            return null;
-        }
-
-        return static::findOne([
-            'password_reset_token' => $token,
-            'status' => self::STATUS_ACTIVE,
-        ]);
+        return $this->hasMany(ExamLog::className(), ['student_id' => 'id']);
     }
 
     /**
-     * Finds user by verification email token
-     *
-     * @param string $token verify email token
-     * @return static|null
+     * @return \yii\db\ActiveQuery
      */
-    public static function findByVerificationToken($token) {
-        return static::findOne([
-            'verification_token' => $token,
-            'status' => self::STATUS_INACTIVE
-        ]);
+    public function getExamLogs0()
+    {
+        return $this->hasMany(ExamLog::className(), ['teacher_id' => 'id']);
     }
 
     /**
-     * Finds out if password reset token is valid
-     *
-     * @param string $token password reset token
-     * @return bool
+     * @return \yii\db\ActiveQuery
      */
-    public static function isPasswordResetTokenValid($token)
+    public function getTeacherDisciplines()
     {
-        if (empty($token)) {
-            return false;
-        }
-
-        $timestamp = (int) substr($token, strrpos($token, '_') + 1);
-        $expire = Yii::$app->params['user.passwordResetTokenExpire'];
-        return $timestamp + $expire >= time();
+        return $this->hasMany(TeacherDisciplines::className(), ['user_id' => 'id']);
     }
 
     /**
-     * {@inheritdoc}
+     * @return \yii\db\ActiveQuery
      */
-    public function getId()
+    public function getDisciplines()
     {
-        return $this->getPrimaryKey();
+        return $this->hasMany(Discipline::className(), ['id' => 'discipline_id'])->viaTable('teacher_disciplines', ['user_id' => 'id']);
     }
 
     /**
-     * {@inheritdoc}
+     * @return \yii\db\ActiveQuery
      */
-    public function getAuthKey()
+    public function getTeacherGroups()
     {
-        return $this->auth_key;
+        return $this->hasMany(TeacherGroups::className(), ['user_id' => 'id']);
     }
 
     /**
-     * {@inheritdoc}
+     * @return \yii\db\ActiveQuery
      */
-    public function validateAuthKey($authKey)
+    public function getGroups()
     {
-        return $this->getAuthKey() === $authKey;
+        return $this->hasMany(Groups::className(), ['id' => 'group_id'])->viaTable('teacher_groups', ['user_id' => 'id']);
     }
 
     /**
-     * Validates password
-     *
-     * @param string $password password to validate
-     * @return bool if password provided is valid for current user
+     * @return \yii\db\ActiveQuery
      */
-    public function validatePassword($password)
+    public function getUserGroups()
     {
-        return Yii::$app->security->validatePassword($password, $this->password_hash);
+        return $this->hasMany(UserGroups::className(), ['user_id' => 'id']);
     }
 
     /**
-     * Generates password hash from password and sets it to the model
-     *
-     * @param string $password
+     * @return \yii\db\ActiveQuery
      */
-    public function setPassword($password)
+    public function getGroups0()
     {
-        $this->password_hash = Yii::$app->security->generatePasswordHash($password);
+        return $this->hasMany(Groups::className(), ['id' => 'group_id'])->viaTable('user_groups', ['user_id' => 'id']);
     }
 
     /**
-     * Generates "remember me" authentication key
+     * @return \yii\db\ActiveQuery
      */
-    public function generateAuthKey()
+    public function getUsersRoles()
     {
-        $this->auth_key = Yii::$app->security->generateRandomString();
+        return $this->hasMany(UsersRoles::className(), ['user_id' => 'id']);
     }
 
     /**
-     * Generates new password reset token
+     * @return \yii\db\ActiveQuery
      */
-    public function generatePasswordResetToken()
+    public function getRoles()
     {
-        $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
-    }
-
-    /**
-     * Generates new token for email verification
-     */
-    public function generateEmailVerificationToken()
-    {
-        $this->verification_token = Yii::$app->security->generateRandomString() . '_' . time();
-    }
-
-    /**
-     * Removes password reset token
-     */
-    public function removePasswordResetToken()
-    {
-        $this->password_reset_token = null;
+        return $this->hasMany(Roles::className(), ['id' => 'role_id'])->viaTable('users_roles', ['user_id' => 'id']);
     }
 }
